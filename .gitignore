@@ -1,0 +1,7 @@
+# Arquivos do sistema e do editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Guia interno do grupo (não faz parte do aplicativo)
+GUIA-REPOSITORIO.md

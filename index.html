@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Xadrez 3D em WebGL2 com Three.js: modelos das peças e cena inicial do tabuleiro." />
+    <meta name="theme-color" content="#020617" />
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+
+    <!-- Tailwind CSS e ícones (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- Three.js r128 como módulo ES, sem build: o importmap mapeia o nome "three" para o CDN -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.module.js"
+        }
+      }
+    </script>
+    <title>Xadrez 3D — Projeto de Computação Gráfica</title>
+  </head>
+  <body class="bg-slate-950 text-slate-100 h-screen overflow-hidden flex flex-col font-sans select-none">
+    <!-- Cabeçalho -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 py-3 flex justify-between items-center z-10 shadow-lg">
+      <div class="flex items-center gap-3">
+        <div class="p-2 bg-indigo-600 rounded-lg shadow-md shadow-indigo-500/20">
+          <i class="fa-solid me-1 fa-chess-king text-xl text-white"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight tracking-wide bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Xadrez 3D WebGL</h1>
+          <p class="text-xs text-slate-400">Projeto de Computação Gráfica</p>
+        </div>
+      </div>
+    </header>
+
+    <!-- Área principal -->
+    <main class="flex-1 relative flex overflow-hidden">
+      <!-- Canvas 3D -->
+      <div id="canvas-container" class="flex-1 h-full relative min-w-[300px] overflow-hidden"></div>
+    </main>
+
+    <noscript>Este jogo precisa de JavaScript e WebGL2 para funcionar.</noscript>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
