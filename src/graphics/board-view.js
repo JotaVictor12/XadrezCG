@@ -48,7 +48,7 @@ export class BoardView {
     const geometry = new THREE.BoxGeometry(1, 0.3, 1);
     for (let x = 0; x < 8; x += 1) {
       for (let z = 0; z < 8; z += 1) {
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial());
+        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ roughness: 0.4 }));
         mesh.position.set(x - 3.5, -0.15, z - 3.5);
         mesh.userData = { x, z };
         this.group.add(mesh);
@@ -60,12 +60,15 @@ export class BoardView {
     // que fica 0,05 acima delas. O chanfro cresce para fora, então os tamanhos o descontam.
     const frameShape = squareOutline(8 + 2 * FRAME_WIDTH - 2 * BEVEL, 0.15);
     frameShape.holes.push(squareOutline(8 + 2 * BEVEL, 0, new THREE.Path()));
-    this.border = new THREE.Mesh(flatSlab(frameShape, 0.4), new THREE.MeshBasicMaterial());
+    this.border = new THREE.Mesh(flatSlab(frameShape, 0.4), new THREE.MeshStandardMaterial({ roughness: 0.5 }));
     this.border.position.y = -0.35;
     this.group.add(this.border);
 
     // Base: placa mais larga e mais escura sob a moldura.
-    this.base = new THREE.Mesh(flatSlab(squareOutline(9.5 - 2 * BEVEL, 0.3), 0.2), new THREE.MeshBasicMaterial());
+    this.base = new THREE.Mesh(
+      flatSlab(squareOutline(9.5 - 2 * BEVEL, 0.3), 0.2),
+      new THREE.MeshStandardMaterial({ roughness: 0.6 }),
+    );
     this.base.position.y = -0.55;
     this.group.add(this.base);
 
