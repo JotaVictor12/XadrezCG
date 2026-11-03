@@ -12,8 +12,8 @@ export class PiecesView {
     scene.add(this.group);
 
     this.materials = {
-      w: new THREE.MeshBasicMaterial({ color: skin.lightPiece }),
-      b: new THREE.MeshBasicMaterial({ color: skin.darkPiece }),
+      w: new THREE.MeshStandardMaterial({ color: skin.lightPiece, roughness: 0.35 }),
+      b: new THREE.MeshStandardMaterial({ color: skin.darkPiece, roughness: 0.4 }),
     };
   }
 
