@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createPieceObject } from './piece-geometry.js';
+import { loadTexture } from './textures.js';
 
 const toWorld = (x, z) => new THREE.Vector3(x - 3.5, 0, z - 3.5);
 
@@ -12,8 +13,8 @@ export class PiecesView {
     scene.add(this.group);
 
     this.materials = {
-      w: new THREE.MeshStandardMaterial({ color: skin.lightPiece, roughness: 0.35 }),
-      b: new THREE.MeshStandardMaterial({ color: skin.darkPiece, roughness: 0.4 }),
+      w: new THREE.MeshStandardMaterial({ map: loadTexture(skin.textures.lightPiece), roughness: 0.35 }),
+      b: new THREE.MeshStandardMaterial({ map: loadTexture(skin.textures.darkPiece), roughness: 0.4 }),
     };
   }
 

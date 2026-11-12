@@ -1,8 +1,11 @@
 import * as THREE from 'three';
+import { loadTexture } from './textures.js';
 
 const FRAME_WIDTH = 0.5; // largura da moldura ao redor das 8×8 casas
 const BEVEL = 0.04; // chanfro das bordas da moldura e da base
 const FILES = 'abcdefgh';
+const SQUARES_PER_IMAGE = 4; // cada casa mostra 1/4 da largura e da altura da imagem
+const FRAME_UV_REPEAT = 0.25; // a moldura usa UV em unidades do mundo: 1 imagem a cada 4 unidades
 
 /** Contorno quadrado centrado na origem, com cantos arredondados opcionais. */
 function squareOutline(size, radius = 0, path = new THREE.Shape()) {
@@ -35,6 +38,23 @@ function flatSlab(shape, height) {
 }
 
 /**
+ * Caixa de uma casa com UV próprio: os UV de 0 a 1 de cada face são reduzidos e deslocados
+ * conforme a posição, para cada casa mostrar um trecho diferente da madeira.
+ */
+function squareGeometry(x, z) {
+  const geometry = new THREE.BoxGeometry(1, 0.3, 1);
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < uv.count; i += 1) {
+    uv.setXY(
+      i,
+      (uv.getX(i) + x + 0.37 * z) / SQUARES_PER_IMAGE,
+      (uv.getY(i) + z + 0.61 * x) / SQUARES_PER_IMAGE,
+    );
+  }
+  return geometry;
+}
+
+/**
  * Tabuleiro 3D: 64 casas, moldura em relevo com as coordenadas (a–h, 1–8) e base.
  */
 export class BoardView {
@@ -45,10 +65,9 @@ export class BoardView {
     this.squares = [];
 
     // Casas: caixas 1 × 0,3 × 1 com o topo em y = 0.
-    const geometry = new THREE.BoxGeometry(1, 0.3, 1);
     for (let x = 0; x < 8; x += 1) {
       for (let z = 0; z < 8; z += 1) {
-        const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ roughness: 0.4 }));
+        const mesh = new THREE.Mesh(squareGeometry(x, z), new THREE.MeshStandardMaterial({ roughness: 0.4 }));
         mesh.position.set(x - 3.5, -0.15, z - 3.5);
         mesh.userData = { x, z };
         this.group.add(mesh);
@@ -116,14 +135,19 @@ export class BoardView {
   }
 
   applySkin(skin) {
-    this.border.material.color.setHex(skin.boardBorder);
-    this.base.material.color.setHex(skin.boardBorder).multiplyScalar(0.6);
+    // Moldura e base usam a mesma madeira; a cor multiplica a textura e escurece a base.
+    const frame = loadTexture(skin.textures.boardBorder, FRAME_UV_REPEAT);
+    this.border.material.map = frame;
+    this.base.material.map = frame;
+    this.base.material.color.setScalar(0.6);
     for (const material of this.labelMaterials.values()) material.color.setHex(skin.boardLabel);
 
     // Casa a8 (x = 0, z = 0) é clara: alterna pela paridade de x + z.
+    const light = loadTexture(skin.textures.boardLight);
+    const dark = loadTexture(skin.textures.boardDark);
     for (const square of this.squares) {
       const { x, z } = square.userData;
-      square.material.color.setHex((x + z) % 2 === 0 ? skin.boardLight : skin.boardDark);
+      square.material.map = (x + z) % 2 === 0 ? light : dark;
     }
   }
 }
