@@ -3,8 +3,13 @@ import * as THREE from 'three';
 /**
  * Peças modeladas por revolução (LatheGeometry): cada perfil é uma lista de
  * pontos [raio, altura] girada em torno do eixo Y.
+ *
+ * Coordenadas de textura: todos os modelos usam UV em unidades do mundo, com a
+ * imagem repetindo a cada 1 unidade, para os veios terem a mesma escala em toda a peça.
  */
 const SEGMENTS = 48;
+const UV_TURNS = 2; // repetições da imagem em uma volta (inteiro: a emenda não aparece)
+const CAP_NORMAL_Y = 0.85; // acima deste valor de |normal.y|, a face é tratada como tampa
 
 /** Pontos de um arco de circunferência (centro cx, cy), para partes arredondadas. */
 function arc(cx, cy, radius, fromDeg, toDeg, steps = 8) {
@@ -29,7 +34,57 @@ const PROFILES = {
   N: [...BASE(0.38), [0.22, 0.3], [0.28, 0.36], [0.28, 0.42], [0, 0.42]],
 };
 
-const lathe = (points) => new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), SEGMENTS);
+/**
+ * Sólido de revolução com UV recalculado:
+ * - laterais: u = voltas em torno do eixo; v = comprimento percorrido ao longo do perfil.
+ *   O v padrão usa o índice do ponto, e por isso esticaria a textura nos trechos longos
+ *   e a comprimiria nos arcos, cheios de pontos;
+ * - tampas (faces quase horizontais): u, v = x, z, uma projeção plana vista de cima.
+ *   Com as coordenadas da lateral, os veios convergiriam no eixo formando raios.
+ */
+function lathe(points) {
+  const geometry = new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), SEGMENTS).toNonIndexed();
+  const lengths = [0];
+  for (let j = 1; j < points.length; j += 1) {
+    const [r0, y0] = points[j - 1];
+    const [r1, y1] = points[j];
+    lengths.push(lengths[j - 1] + Math.hypot(r1 - r0, y1 - y0));
+  }
+  const { position, normal, uv } = geometry.attributes;
+  // A cada 6 vértices (2 triângulos) há um quadrilátero; decidir por quadrilátero deixa a
+  // fronteira entre lateral e tampa em um anel limpo, sem serrilhado.
+  for (let quad = 0; quad < uv.count; quad += 6) {
+    let normalY = 0;
+    for (let i = quad; i < quad + 6; i += 1) normalY += normal.getY(i) / 6;
+    const isCap = Math.abs(normalY) > CAP_NORMAL_Y;
+    for (let i = quad; i < quad + 6; i += 1) {
+      if (isCap) uv.setXY(i, position.getX(i), position.getZ(i));
+      else uv.setXY(i, uv.getX(i) * UV_TURNS, lengths[Math.round(uv.getY(i) * (points.length - 1))]);
+    }
+  }
+  return geometry;
+}
+
+/**
+ * UV por projeção: cada triângulo usa o plano mais alinhado à sua face. Nas faces
+ * laterais, v segue a altura, para os veios da madeira ficarem em pé.
+ */
+function projectUV(source) {
+  const geometry = source.index ? source.toNonIndexed() : source;
+  const { position, normal, uv } = geometry.attributes;
+  for (let t = 0; t < uv.count; t += 3) {
+    const nx = Math.abs(normal.getX(t));
+    const ny = Math.abs(normal.getY(t));
+    const nz = Math.abs(normal.getZ(t));
+    for (let i = t; i < t + 3; i += 1) {
+      const [x, y, z] = [position.getX(i), position.getY(i), position.getZ(i)];
+      if (ny >= nx && ny >= nz) uv.setXY(i, x, z); // topo e base
+      else if (nx >= nz) uv.setXY(i, z, y); // laterais em x
+      else uv.setXY(i, x, y); // frente e trás
+    }
+  }
+  return geometry;
+}
 
 // Cabeça do cavalo: silhueta lateral [frente, altura] extrudada na espessura.
 const HEAD_THICKNESS = 0.2;
@@ -56,7 +111,7 @@ function knightHeadShape() {
  * orelhas (cones), olhos (esferas) e crina (caixas ao longo da nuca).
  */
 function knightHead() {
-  const head = new THREE.ExtrudeGeometry(knightHeadShape(), {
+  let head = new THREE.ExtrudeGeometry(knightHeadShape(), {
     depth: HEAD_THICKNESS,
     bevelEnabled: true,
     bevelThickness: HEAD_BEVEL,
@@ -65,11 +120,12 @@ function knightHead() {
     curveSegments: 12,
   });
   head.translate(0, 0, -HEAD_THICKNESS / 2); // centraliza a espessura em z
+  head = projectUV(head); // antes de girar: nas faces da cabeça, u, v = x, y da silhueta
   head.rotateY(Math.PI / 2); // a silhueta passa para o plano YZ: "frente" vira -z
 
   const side = HEAD_THICKNESS / 2 + HEAD_BEVEL; // face lateral da cabeça
-  const ear = new THREE.ConeGeometry(0.05, 0.14, 8);
-  const eye = new THREE.SphereGeometry(0.035, 12, 8);
+  const ear = projectUV(new THREE.ConeGeometry(0.05, 0.14, 8));
+  const eye = projectUV(new THREE.SphereGeometry(0.035, 12, 8));
   const parts = [
     { geometry: head },
     { geometry: ear, position: [0.08, 1.19, 0], rotationX: 0.25 },
@@ -80,7 +136,7 @@ function knightHead() {
 
   // Crina: tufos alinhados à tangente da nuca, um pouco para fora do contorno.
   const nape = new THREE.QuadraticBezierCurve(...NAPE.map(([u, v]) => new THREE.Vector2(u, v)));
-  const tuft = new THREE.BoxGeometry(0.08, 0.12, 0.12);
+  const tuft = projectUV(new THREE.BoxGeometry(0.08, 0.12, 0.12));
   for (let i = 0; i < 6; i += 1) {
     const t = 0.06 + i * 0.12;
     const point = nape.getPoint(t);
@@ -100,8 +156,8 @@ function buildParts(type) {
       return [body, ...knightHead()];
     case 'K': {
       // Cruz no topo: diferencia o rei da dama.
-      const vertical = new THREE.BoxGeometry(0.08, 0.3, 0.08);
-      const horizontal = new THREE.BoxGeometry(0.24, 0.08, 0.08);
+      const vertical = projectUV(new THREE.BoxGeometry(0.08, 0.3, 0.08));
+      const horizontal = projectUV(new THREE.BoxGeometry(0.24, 0.08, 0.08));
       return [
         body,
         { geometry: vertical, position: [0, 1.65, 0] },

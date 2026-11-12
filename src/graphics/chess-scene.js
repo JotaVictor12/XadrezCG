@@ -4,7 +4,7 @@ import { BoardView } from './board-view.js';
 import { PiecesView } from './pieces-view.js';
 
 /**
- * Cena 3D: renderer, câmera (duas posições), luzes, tabuleiro e peças.
+ * Cena 3D: renderer, câmera (duas posições), luzes, tabuleiro e peças com textura.
  * Apenas desenha a posição recebida.
  *
  * Teclado:
@@ -40,6 +40,13 @@ export class ChessScene {
 
     this._addLights();
 
+    // As imagens das texturas carregam em segundo plano: a cena só é desenhada quando todas chegam.
+    this.texturesLoaded = false;
+    THREE.DefaultLoadingManager.onLoad = () => {
+      this.texturesLoaded = true;
+      this.render();
+    };
+
     this.board = new BoardView(this.scene, this.skin);
     this.pieces = new PiecesView(this.scene, this.skin);
 
@@ -69,7 +76,7 @@ export class ChessScene {
   render() {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
-    if (!width || !height) return;
+    if (!width || !height || !this.texturesLoaded) return;
     // Matriz de projeção: recalculada aqui sempre que a proporção da tela muda.
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
