@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { HIGHLIGHT_COLORS } from '../config/skins.js';
 import { loadTexture } from './textures.js';
 
 const FRAME_WIDTH = 0.5; // largura da moldura ao redor das 8×8 casas
@@ -6,6 +7,7 @@ const BEVEL = 0.04; // chanfro das bordas da moldura e da base
 const FILES = 'abcdefgh';
 const SQUARES_PER_IMAGE = 4; // cada casa mostra 1/4 da largura e da altura da imagem
 const FRAME_UV_REPEAT = 0.25; // a moldura usa UV em unidades do mundo: 1 imagem a cada 4 unidades
+const HIGHLIGHT_GLOW = 0.35; // fração da cor de destaque somada como brilho (emissive)
 
 /** Contorno quadrado centrado na origem, com cantos arredondados opcionais. */
 function squareOutline(size, radius = 0, path = new THREE.Shape()) {
@@ -55,7 +57,8 @@ function squareGeometry(x, z) {
 }
 
 /**
- * Tabuleiro 3D: 64 casas, moldura em relevo com as coordenadas (a–h, 1–8) e base.
+ * Tabuleiro 3D: 64 casas, moldura em relevo com as coordenadas (a–h, 1–8), base
+ * e destaques (peça selecionada e casas de destino).
  */
 export class BoardView {
   constructor(scene, skin) {
@@ -69,7 +72,7 @@ export class BoardView {
       for (let z = 0; z < 8; z += 1) {
         const mesh = new THREE.Mesh(squareGeometry(x, z), new THREE.MeshStandardMaterial({ roughness: 0.4 }));
         mesh.position.set(x - 3.5, -0.15, z - 3.5);
-        mesh.userData = { x, z };
+        mesh.userData = { type: 'square', x, z }; // usado pelo raycasting para achar a casa
         this.group.add(mesh);
         this.squares.push(mesh);
       }
@@ -148,6 +151,25 @@ export class BoardView {
     for (const square of this.squares) {
       const { x, z } = square.userData;
       square.material.map = (x + z) % 2 === 0 ? light : dark;
+    }
+  }
+
+  /**
+   * Destaca a casa da peça selecionada e as casas para onde ela pode ir.
+   * @param {{ selected?: {x,z}, targets?: {x,z,capture}[] }} highlights
+   */
+  setHighlights({ selected = null, targets = [] } = {}) {
+    for (const square of this.squares) {
+      const { x, z } = square.userData;
+      const target = targets.find((t) => t.x === x && t.z === z);
+      let color = null;
+      if (target) color = target.capture ? HIGHLIGHT_COLORS.capture : HIGHLIGHT_COLORS.move;
+      if (selected && selected.x === x && selected.z === z) color = HIGHLIGHT_COLORS.selected;
+
+      // A cor multiplica a textura (tinge a madeira, que continua visível) e o emissive soma
+      // um brilho que não depende das luzes. Sem destaque: cor branca (textura pura) e sem brilho.
+      square.material.color.setHex(color ?? 0xffffff);
+      square.material.emissive.setHex(color ?? 0x000000).multiplyScalar(HIGHLIGHT_GLOW);
     }
   }
 }

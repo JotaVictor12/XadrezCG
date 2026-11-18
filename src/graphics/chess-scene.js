@@ -5,7 +5,11 @@ import { PiecesView } from './pieces-view.js';
 
 /**
  * Cena 3D: renderer, câmera (duas posições), luzes, tabuleiro e peças com textura.
- * Apenas desenha a posição recebida.
+ * Não conhece as regras do xadrez: desenha a posição recebida e informa qual casa
+ * foi clicada (raycasting).
+ *
+ * Mouse:
+ *   clique  seleciona uma peça ou a casa de destino (onSquareClick)
  *
  * Teclado:
  *   C       alterna a câmera entre o lado das brancas e o das pretas
@@ -14,10 +18,11 @@ import { PiecesView } from './pieces-view.js';
 export class ChessScene {
   /**
    * @param {HTMLElement} container
-   * @param {{ skin?: string }} options
+   * @param {{ skin?: string, onSquareClick?: (x: number, z: number) => void }} options
    */
-  constructor(container, { skin = DEFAULT_SKIN } = {}) {
+  constructor(container, { skin = DEFAULT_SKIN, onSquareClick = null } = {}) {
     this.container = container;
+    this.onSquareClick = onSquareClick;
     this.skin = SKINS[skin];
 
     this.scene = new THREE.Scene();
@@ -50,12 +55,21 @@ export class ChessScene {
     this.board = new BoardView(this.scene, this.skin);
     this.pieces = new PiecesView(this.scene, this.skin);
 
+    this._raycaster = new THREE.Raycaster();
+    this._pointer = new THREE.Vector2();
+
     this._bindEvents();
   }
 
   /** Mostra uma posição inteira. */
   showPosition(position) {
     this.pieces.sync(position);
+    this.render();
+  }
+
+  /** Destaca a peça selecionada e os destinos possíveis (calculados pelo núcleo). */
+  setHighlights(highlights) {
+    this.board.setHighlights(highlights);
     this.render();
   }
 
@@ -105,6 +119,11 @@ export class ChessScene {
   }
 
   _bindEvents() {
+    this.renderer.domElement.addEventListener('click', (e) => {
+      const square = this._pickSquare(e);
+      if (square) this.onSquareClick?.(square.x, square.z);
+    });
+
     const lightKeys = { 1: 'ambient', 2: 'key', 3: 'fill' };
     window.addEventListener('keydown', (e) => {
       if (e.key === 'c' || e.key === 'C') this.flipCamera();
@@ -113,5 +132,25 @@ export class ChessScene {
 
     // A cena é estática: só precisa ser desenhada de novo quando algo muda.
     new ResizeObserver(() => this.render()).observe(this.container);
+  }
+
+  /** Raycasting: lança um raio da câmera pelo ponto clicado e retorna { x, z } da casa atingida ou null. */
+  _pickSquare(event) {
+    // Posição do clique em coordenadas normalizadas (NDC): de -1 a 1 nos dois eixos, y para cima.
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this._pointer.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this._raycaster.setFromCamera(this._pointer, this.camera);
+
+    // Interseção do raio com as casas e as peças; a primeira da lista é a mais próxima da câmera.
+    const hits = this._raycaster.intersectObjects([this.board.group, this.pieces.group], true);
+    if (hits.length === 0) return null;
+
+    // Sobe na hierarquia até a peça (ou casa) que carrega a coordenada.
+    let object = hits[0].object;
+    while (object && !object.userData.isPiece && object.userData.type !== 'square') object = object.parent;
+    return object ? { x: object.userData.x, z: object.userData.z } : null;
   }
 }

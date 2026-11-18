@@ -33,7 +33,7 @@ export class PiecesView {
     const object = createPieceObject(type, this.materials[color]);
     if (color === 'b') object.rotation.y = Math.PI; // pretas olham para as brancas
     object.position.copy(toWorld(x, z));
-    object.userData = { type, color, x, z };
+    object.userData = { isPiece: true, type, color, x, z }; // usado pelo raycasting
     this.group.add(object);
     return object;
   }

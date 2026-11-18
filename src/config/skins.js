@@ -18,3 +18,10 @@ export const SKINS = {
 };
 
 export const DEFAULT_SKIN = 'classic';
+
+/** Cores de destaque das casas: peça selecionada, destino livre e destino com captura. */
+export const HIGHLIGHT_COLORS = {
+  selected: 0x00d2ff,
+  move: 0x20bf6b,
+  capture: 0xff3366,
+};
