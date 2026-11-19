@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Xadrez 3D em WebGL2 com Three.js: tabuleiro e peças com texturas de madeira, duas posições de câmera e três fontes de luz." />
+    <meta name="description" content="Xadrez 3D em WebGL2 com Three.js para dois jogadores: regras completas, pontuação por peças capturadas e fim de partida por xeque-mate ou empate." />
     <meta name="theme-color" content="#020617" />
     <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
 
@@ -33,13 +33,89 @@
           <p class="text-xs text-slate-400">Projeto de Computação Gráfica</p>
         </div>
       </div>
+
+      <!-- Indicador de turno -->
+      <div class="flex items-center gap-3 bg-slate-800/80 border border-slate-700/80 px-4 py-1.5 rounded-full shadow-inner">
+        <span class="text-xs font-medium text-slate-400">Vez de jogar:</span>
+        <div id="turnBadge" class="flex items-center gap-2 font-bold text-sm text-slate-900 bg-amber-100 px-3 py-0.5 rounded-full shadow-sm transition-all duration-300">
+          <span id="turnDot" class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+          <span id="turnText">BRANCAS</span>
+        </div>
+      </div>
     </header>
 
     <!-- Área principal -->
     <main class="flex-1 relative flex overflow-hidden">
+      <!-- Alerta de xeque / fim de jogo -->
+      <div id="bannerAlert" role="status" aria-live="polite" class="absolute top-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-all duration-500 transform -translate-y-12 opacity-0">
+        <div id="bannerContent" class="bg-red-600/90 text-white font-extrabold text-lg px-8 py-2.5 rounded-full shadow-2xl backdrop-blur-md tracking-wider flex items-center gap-3 border border-red-400/50">
+          <i class="fa-solid fa-triangle-exclamation text-xl animate-bounce"></i>
+          <span id="bannerText">XEQUE!</span>
+        </div>
+      </div>
+
       <!-- Canvas 3D -->
-      <div id="canvas-container" class="flex-1 h-full relative min-w-[300px] overflow-hidden"></div>
+      <div id="canvas-container" class="flex-1 h-full cursor-pointer relative min-w-[300px] overflow-hidden"></div>
+
+      <!-- Pontuação e reinício -->
+      <aside class="w-64 bg-slate-900/90 border-l border-slate-800 backdrop-blur-md flex flex-col z-10 shadow-2xl">
+        <div class="p-4 border-b border-slate-800">
+          <h2 class="font-semibold text-sm flex items-center gap-2 text-slate-300">
+            <i class="fa-solid fa-trophy text-indigo-400"></i> Pontuação
+          </h2>
+        </div>
+
+        <div class="flex-1 p-4 space-y-3">
+          <div class="flex items-center justify-between bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
+            <span class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Brancas
+            </span>
+            <span class="text-2xl font-bold text-slate-100"><span id="scoreWhite">0</span> <span class="text-xs font-medium text-slate-400">pts</span></span>
+          </div>
+          <div class="flex items-center justify-between bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-3">
+            <span class="flex items-center gap-2 text-sm font-semibold text-slate-200">
+              <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span> Pretas
+            </span>
+            <span class="text-2xl font-bold text-slate-100"><span id="scoreBlack">0</span> <span class="text-xs font-medium text-slate-400">pts</span></span>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">
+            Cada peça capturada soma pontos: peão 1, cavalo 3, bispo 3, torre 5 e dama 9.
+          </p>
+        </div>
+
+        <div class="p-3 border-t border-slate-800 bg-slate-900/50">
+          <button id="btnReset" type="button" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors shadow shadow-indigo-600/30">
+            <i class="fa-solid fa-arrow-rotate-left"></i> Reiniciar Partida
+          </button>
+        </div>
+      </aside>
     </main>
+
+    <!-- Modal de promoção de peão -->
+    <div id="promotionModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center hidden opacity-0 transition-opacity duration-300">
+      <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center transform scale-95 transition-transform duration-300">
+        <h3 class="text-xl font-bold text-slate-100 mb-1">Promoção de Peão!</h3>
+        <p class="text-xs text-slate-400 mb-6">Escolha a peça que substituirá o peão (Esc para cancelar):</p>
+        <div class="grid grid-cols-4 gap-3">
+          <button type="button" data-piece="Q" class="promo-btn bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
+            <i class="fa-solid fa-chess-queen text-3xl text-amber-400"></i>
+            <span class="text-xs font-semibold">Dama</span>
+          </button>
+          <button type="button" data-piece="R" class="promo-btn bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
+            <i class="fa-solid fa-chess-rook text-3xl text-slate-300"></i>
+            <span class="text-xs font-semibold">Torre</span>
+          </button>
+          <button type="button" data-piece="B" class="promo-btn bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
+            <i class="fa-solid fa-chess-bishop text-3xl text-emerald-400"></i>
+            <span class="text-xs font-semibold">Bispo</span>
+          </button>
+          <button type="button" data-piece="N" class="promo-btn bg-slate-800 hover:bg-indigo-600 border border-slate-700 hover:border-indigo-500 rounded-xl p-4 flex flex-col items-center gap-2 transition-all">
+            <i class="fa-solid fa-chess-knight text-3xl text-cyan-400"></i>
+            <span class="text-xs font-semibold">Cavalo</span>
+          </button>
+        </div>
+      </div>
+    </div>
 
     <noscript>Este jogo precisa de JavaScript e WebGL2 para funcionar.</noscript>
     <script type="module" src="./src/main.js"></script>
