@@ -1,5 +1,5 @@
 /**
- * Interface 2D (HUD): turno, pontuação, faixa de alertas e botão de reiniciar.
+ * Interface 2D (HUD): turno, pontuação, histórico de lances, faixa de alertas e botões.
  * Só manipula o DOM; não conhece regras nem Three.js.
  */
 
@@ -22,6 +22,8 @@ const TURN_STYLES = {
   },
 };
 
+const EMPTY_HISTORY_TEXT = 'Aguardando o primeiro movimento...';
+
 export class Hud {
   constructor(root = document) {
     const $ = (id) => root.getElementById(id);
@@ -30,27 +32,77 @@ export class Hud {
     this.turnText = $('turnText');
     this.scoreWhite = $('scoreWhite');
     this.scoreBlack = $('scoreBlack');
+    this.moveLog = $('moveLog');
+    this.moveCount = $('moveCount');
     this.bannerAlert = $('bannerAlert');
     this.bannerText = $('bannerText');
+    this.skinSelector = $('skinSelector');
+    this.btnFlip = $('btnFlip');
+    this.btnUndo = $('btnUndo');
     this.btnReset = $('btnReset');
     this._bannerTimer = null;
   }
 
-  bind({ onReset }) {
+  bind({ onFlip, onUndo, onReset, onSkinChange }) {
+    this.btnFlip.addEventListener('click', onFlip);
+    this.btnUndo.addEventListener('click', onUndo);
     this.btnReset.addEventListener('click', onReset);
+    this.skinSelector.addEventListener('change', (e) => onSkinChange(e.target.value));
   }
 
-  setTurn(color) {
+  setSkin(key) {
+    this.skinSelector.value = key;
+  }
+
+  setTurn(color, playerName) {
     const style = TURN_STYLES[color];
     this.turnBadge.className = style.badge;
     this.turnDot.className = style.dot;
-    this.turnText.textContent = style.text;
+    this.turnText.textContent = `${playerName} (${style.text})`;
   }
 
   /** @param {{ w: number, b: number }} score */
   setScore(score) {
     this.scoreWhite.textContent = score.w;
     this.scoreBlack.textContent = score.b;
+  }
+
+  setUndoEnabled(enabled) {
+    this.btnUndo.disabled = !enabled;
+    this.btnUndo.classList.toggle('opacity-40', !enabled);
+    this.btnUndo.classList.toggle('cursor-not-allowed', !enabled);
+  }
+
+  /** Histórico em notação algébrica, em pares (brancas / pretas) por linha. */
+  renderHistory(sanMoves) {
+    this.moveCount.textContent = `${sanMoves.length} ${sanMoves.length === 1 ? 'lance' : 'lances'}`;
+    this.moveLog.replaceChildren();
+
+    if (sanMoves.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'text-slate-500 italic text-center py-4';
+      empty.textContent = EMPTY_HISTORY_TEXT;
+      this.moveLog.appendChild(empty);
+      return;
+    }
+
+    for (let i = 0; i < sanMoves.length; i += 2) {
+      const row = document.createElement('div');
+      row.className = 'grid grid-cols-[2rem_1fr_1fr] gap-1 p-1.5 rounded bg-slate-800/50 border border-slate-700/50 text-slate-300';
+
+      const number = document.createElement('strong');
+      number.className = 'text-indigo-400';
+      number.textContent = `${i / 2 + 1}.`;
+
+      const white = document.createElement('span');
+      white.textContent = sanMoves[i];
+      const black = document.createElement('span');
+      black.textContent = sanMoves[i + 1] ?? '';
+
+      row.append(number, white, black);
+      this.moveLog.appendChild(row);
+    }
+    this.moveLog.scrollTop = this.moveLog.scrollHeight;
   }
 
   /** @param {'check'|'win'|'draw'} kind */

@@ -4,6 +4,7 @@ import { ChessScene } from './graphics/chess-scene.js';
 import { isWebGL2Supported } from './graphics/support.js';
 import { Hud } from './ui/hud.js';
 import { PromotionModal } from './ui/promotion-modal.js';
+import { PlayerMenu } from './ui/player-menu.js';
 import { GameController } from './app/controller.js';
 
 const container = document.getElementById('canvas-container');
@@ -14,8 +15,9 @@ if (isWebGL2Supported()) {
     scene: new ChessScene(container, { skin: DEFAULT_SKIN }),
     hud: new Hud(),
     promotionModal: new PromotionModal(),
+    playerMenu: new PlayerMenu(),
   });
-  controller.start();
+  controller.start(DEFAULT_SKIN);
 } else {
   container.innerHTML =
     '<div class="h-full flex items-center justify-center text-center p-8 text-slate-400">' +

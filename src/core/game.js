@@ -1,5 +1,6 @@
 /**
- * Partida de xadrez: posição atual, histórico, pontuação e detecção de fim de jogo.
+ * Partida de xadrez: posição atual, histórico (em SAN), desfazer, pontuação e detecção
+ * de fim de jogo.
  * Não conhece Three.js nem o DOM.
  */
 import { opposite, PIECE_VALUES } from './constants.js';
@@ -12,6 +13,7 @@ import {
   isInCheck,
   toFEN,
 } from './position.js';
+import { toSAN } from './notation.js';
 
 /** Chave de repetição: peças + vez + roques + en passant (só se a captura for possível). */
 function repetitionKey(position, enPassantCapturable) {
@@ -33,7 +35,7 @@ export class Game {
 
   reset(fen) {
     this.position = fen ? fromFEN(fen) : createInitialPosition();
-    this.history = []; // { move }
+    this.history = []; // { move, san, before }
     this.keys = [];
     this._analyze();
     this.keys.push(this.key);
@@ -50,7 +52,7 @@ export class Game {
   }
 
   /**
-   * Joga um lance, se for legal. Retorna { move, status } ou null.
+   * Joga um lance, se for legal. Retorna { move, san, status } ou null.
    * `candidate` precisa ter from, to e (se houver promoção) promotion.
    */
   play(candidate) {
@@ -58,12 +60,33 @@ export class Game {
     const move = this.legalMoves.find((m) => sameMove(m, candidate));
     if (!move) return null;
 
-    this.history.push({ move });
+    const san = toSAN(this.position, move, this.legalMoves);
+    this.history.push({ move, san, before: this.position });
     this.position = applyMove(this.position, move);
     this._analyze();
     this.keys.push(this.key);
     this.status = this._computeStatus();
-    return { move, status: this.status };
+    return { move, san, status: this.status };
+  }
+
+  /** Desfaz o último lance. Retorna a entrada do histórico desfeita ou null. */
+  undo() {
+    const last = this.history.pop();
+    if (!last) return null;
+    this.keys.pop();
+    this.position = last.before;
+    this._analyze();
+    this.status = this._computeStatus();
+    return last;
+  }
+
+  /** Lances jogados em notação algébrica (ex.: ["e4", "e5", "Nf3"]). */
+  get sanMoves() {
+    return this.history.map((entry) => entry.san);
+  }
+
+  get lastMove() {
+    return this.history.length ? this.history[this.history.length - 1].move : null;
   }
 
   /**
