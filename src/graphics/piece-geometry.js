@@ -181,6 +181,8 @@ export function createPieceObject(type, material) {
   const group = new THREE.Group();
   for (const part of getParts(type)) {
     const mesh = new THREE.Mesh(part.geometry, material);
+    mesh.castShadow = true; // projeta sombra no tabuleiro e nas outras peças
+    mesh.receiveShadow = true;
     if (part.rotationX) mesh.rotation.x = part.rotationX;
     if (part.position) mesh.position.set(...part.position);
     group.add(mesh);

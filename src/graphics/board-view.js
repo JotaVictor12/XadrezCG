@@ -58,7 +58,7 @@ function squareGeometry(x, z) {
 
 /**
  * Tabuleiro 3D: 64 casas, moldura em relevo com as coordenadas (a–h, 1–8), base
- * e destaques (peça selecionada e casas de destino).
+ * e destaques (seleção, destinos, xeque e último lance).
  */
 export class BoardView {
   constructor(scene, skin) {
@@ -72,6 +72,7 @@ export class BoardView {
       for (let z = 0; z < 8; z += 1) {
         const mesh = new THREE.Mesh(squareGeometry(x, z), new THREE.MeshStandardMaterial({ roughness: 0.4 }));
         mesh.position.set(x - 3.5, -0.15, z - 3.5);
+        mesh.receiveShadow = true; // recebe a sombra das peças
         mesh.userData = { type: 'square', x, z }; // usado pelo raycasting para achar a casa
         this.group.add(mesh);
         this.squares.push(mesh);
@@ -84,6 +85,8 @@ export class BoardView {
     frameShape.holes.push(squareOutline(8 + 2 * BEVEL, 0, new THREE.Path()));
     this.border = new THREE.Mesh(flatSlab(frameShape, 0.4), new THREE.MeshStandardMaterial({ roughness: 0.5 }));
     this.border.position.y = -0.35;
+    this.border.castShadow = true;
+    this.border.receiveShadow = true;
     this.group.add(this.border);
 
     // Base: placa mais larga e mais escura sob a moldura.
@@ -92,6 +95,7 @@ export class BoardView {
       new THREE.MeshStandardMaterial({ roughness: 0.6 }),
     );
     this.base.position.y = -0.55;
+    this.base.receiveShadow = true;
     this.group.add(this.base);
 
     this._addCoordinates();
@@ -138,7 +142,7 @@ export class BoardView {
   }
 
   applySkin(skin) {
-    // Moldura e base usam a mesma madeira; a cor multiplica a textura e escurece a base.
+    // Moldura e base usam a mesma imagem; a cor multiplica a textura e escurece a base.
     const frame = loadTexture(skin.textures.boardBorder, FRAME_UV_REPEAT);
     this.border.material.map = frame;
     this.base.material.map = frame;
@@ -155,18 +159,23 @@ export class BoardView {
   }
 
   /**
-   * Destaca a casa da peça selecionada e as casas para onde ela pode ir.
-   * @param {{ selected?: {x,z}, targets?: {x,z,capture}[] }} highlights
+   * Destaca a peça selecionada, os destinos possíveis, o rei em xeque e o último lance.
+   * @param {{ selected?: {x,z}, targets?: {x,z,capture}[], check?: {x,z}, lastMove?: {from,to} }} highlights
    */
-  setHighlights({ selected = null, targets = [] } = {}) {
+  setHighlights({ selected = null, targets = [], check = null, lastMove = null } = {}) {
+    const same = (a, x, z) => a && a.x === x && a.z === z;
     for (const square of this.squares) {
       const { x, z } = square.userData;
       const target = targets.find((t) => t.x === x && t.z === z);
-      let color = null;
-      if (target) color = target.capture ? HIGHLIGHT_COLORS.capture : HIGHLIGHT_COLORS.move;
-      if (selected && selected.x === x && selected.z === z) color = HIGHLIGHT_COLORS.selected;
 
-      // A cor multiplica a textura (tinge a madeira, que continua visível) e o emissive soma
+      // Prioridade (a última vence): último lance < xeque < destino < seleção.
+      let color = null;
+      if (lastMove && (same(lastMove.from, x, z) || same(lastMove.to, x, z))) color = HIGHLIGHT_COLORS.lastMove;
+      if (same(check, x, z)) color = HIGHLIGHT_COLORS.check;
+      if (target) color = target.capture ? HIGHLIGHT_COLORS.capture : HIGHLIGHT_COLORS.move;
+      if (same(selected, x, z)) color = HIGHLIGHT_COLORS.selected;
+
+      // A cor multiplica a textura (tinge a imagem, que continua visível) e o emissive soma
       // um brilho que não depende das luzes. Sem destaque: cor branca (textura pura) e sem brilho.
       square.material.color.setHex(color ?? 0xffffff);
       square.material.emissive.setHex(color ?? 0x000000).multiplyScalar(HIGHLIGHT_GLOW);
